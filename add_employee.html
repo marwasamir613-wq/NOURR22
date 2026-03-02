@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>بيانات الموظف - نور للإضاءة</title>
+
+<script src="https://cdn.tailwindcss.com"></script>
+
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet"/>
+
+<style>
+body{
+  font-family:'Cairo',sans-serif;
+  background:#f8fafc;
+}
+</style>
+</head>
+
+<body class="p-6 pb-20 text-right font-bold italic">
+
+<header class="max-w-md mx-auto flex items-center gap-4 mb-8">
+  <button onclick="clearAndGoBack()"
+    class="w-10 h-10 bg-white rounded-full shadow flex items-center justify-center border border-slate-100">
+    <span class="material-icons-round text-slate-600">arrow_forward</span>
+  </button>
+
+  <h1 id="pageTitle" class="text-xl font-black text-slate-800 italic">
+    بيانات موظف جديد
+  </h1>
+</header>
+
+<main class="max-w-md mx-auto bg-white p-8 rounded-[2.5rem] shadow-xl border border-blue-50 space-y-5">
+
+  <div class="flex flex-col items-center gap-3 mb-4">
+    <div id="photoPreview"
+      class="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center border-2 border-dashed border-blue-200 text-slate-400 relative overflow-hidden">
+      <span id="uploadIcon" class="material-icons-round text-4xl">add_a_photo</span>
+      <img id="previewImg" class="hidden w-full h-full object-cover">
+      <input type="file"
+        id="empPhoto"
+        accept="image/*"
+        class="absolute inset-0 opacity-0 cursor-pointer"
+        onchange="previewFile()">
+    </div>
+
+    <p class="text-[10px] font-black text-slate-400 uppercase">
+      صورة الموظف
+    </p>
+  </div>
+
+  <div class="space-y-4">
+
+    <input type="text"
+      id="empName"
+      placeholder="الاسم الكامل"
+      class="w-full bg-slate-50 p-4 rounded-2xl text-sm">
+
+    <!-- ✅ نفس التصميم.. بس الأقسام هتتعبي تلقائي -->
+    <select id="empDept"
+      class="w-full bg-slate-50 p-4 rounded-2xl text-sm"
+      onchange="handleDeptChange()">
+      <option value="">اختر القسم</option>
+      <!-- هيتبني تلقائيًا -->
+    </select>
+
+    <input type="text"
+      id="empJob"
+      placeholder="المهنة"
+      class="w-full bg-slate-50 p-4 rounded-2xl text-sm">
+
+    <input type="number"
+      id="empNationalID"
+      placeholder="الرقم القومي"
+      class="w-full bg-slate-50 p-4 rounded-2xl text-sm">
+
+    <div class="grid grid-cols-2 gap-3">
+      <input type="number"
+        id="empAge"
+        placeholder="السن"
+        class="bg-slate-50 p-4 rounded-2xl text-sm">
+
+      <select id="empStatus"
+        class="bg-slate-50 p-4 rounded-2xl text-sm">
+        <option value="">حالة الموظف</option>
+        <option value="نشط">نشط</option>
+        <option value="موقوف">موقوف</option>
+      </select>
+    </div>
+
+    <select id="empType"
+      class="w-full bg-slate-50 p-4 rounded-2xl text-sm">
+      <option value="">نوع الموظف</option>
+      <option value="عامل أساسي">عامل أساسي</option>
+      <option value="عامل غير أساسي">عامل غير أساسي</option>
+    </select>
+
+    <div class="pt-2 border-t">
+      <div class="grid grid-cols-2 gap-3">
+        <input type="number"
+          id="salaryMonthly"
+          placeholder="الراتب الأساسي"
+          class="bg-blue-50 p-4 rounded-2xl text-sm">
+        <input type="number"
+          id="salaryDaily"
+          placeholder="اليومية"
+          class="bg-emerald-50 p-4 rounded-2xl text-sm">
+      </div>
+    </div>
+
+    <input type="date"
+      id="empStartDate"
+      class="w-full bg-slate-50 p-4 rounded-2xl text-sm">
+
+  </div>
+
+  <button onclick="saveEmployeeData()"
+    class="w-full bg-[#137fec] text-white py-4 rounded-2xl font-black text-lg shadow-lg">
+    حفظ بيانات الموظف
+  </button>
+
+</main>
+
+<!-- Firebase API -->
+<script type="module" src="js/storage.js"></script>
+<script type="module" src="js/cloud-sync.js"></script>
+
+<script type="module">
+  let base64Image = "";
+
+  // الأقسام الأساسية (زي ما كانت)
+  const DEFAULT_DEPTS = ["المكابس","التجميع","الرش","المخزن"];
+
+  function uniq(arr){
+    const out = [];
+    (arr||[]).forEach(x=>{
+      x = String(x||"").trim();
+      if(x && !out.includes(x)) out.push(x);
+    });
+    return out;
+  }
+
+  // قراءة JSON من Firebase مع fallback للوكال
+  async function getJSON(key, fallback=[]){
+    try{
+      const v = await Storage.get(key);
+      if(!v) return fallback;
+      // نخلي نسخة في localStorage كـ cache
+      localStorage.setItem(key, v);
+      return JSON.parse(v);
+    }catch(e){
+      try{
+        return JSON.parse(localStorage.getItem(key) || "[]") || fallback;
+      }catch{
+        return fallback;
+      }
+    }
+  }
+
+  // حفظ JSON في Firebase + localStorage
+  async function setJSON(key, value){
+    const s = JSON.stringify(value);
+    localStorage.setItem(key, s);
+    await Storage.set(key, s);
+  }
+
+  // ✅ الحصول على الأقسام (من nour_departments أو من الموظفين كإنقاذ)
+  async function getDepartments(){
+    // 1) لو عندنا قائمة أقسام محفوظة
+    const stored = await getJSON("nour_departments", []);
+    if(stored && stored.length){
+      return uniq([...DEFAULT_DEPTS, ...stored]);
+    }
+
+    // 2) إنقاذ: استخرج الأقسام من الموظفين الموجودين
+    const employees = await getJSON("nour_employees", []);
+    const fromEmployees = employees.map(e=>e?.department).filter(Boolean);
+    const merged = uniq([...DEFAULT_DEPTS, ...fromEmployees]);
+
+    // احفظها كقائمة أقسام عشان ترجع دايمًا
+    if(merged.length){
+      try{ await setJSON("nour_departments", merged); }catch(e){}
+    }
+
+    return merged;
+  }
+
+  async function saveDepartments(list){
+    await setJSON("nour_departments", uniq(list));
+  }
+
+  async function buildDeptSelect(selected=""){
+    const sel = document.getElementById("empDept");
+    if(!sel) return;
+
+    sel.innerHTML = `<option value="">اختر القسم</option>`;
+
+    const depts = await getDepartments();
+    depts.forEach(d=>{
+      const opt = document.createElement("option");
+      opt.value = d;
+      opt.textContent = `قسم ${d}`;
+      sel.appendChild(opt);
+    });
+
+    // خيار إضافة قسم جديد
+    const addOpt = document.createElement("option");
+    addOpt.value = "__add_new__";
+    addOpt.textContent = "➕ إضافة قسم جديد";
+    sel.appendChild(addOpt);
+
+    if(selected) sel.value = selected;
+  }
+
+  // لازم تكون global عشان onchange
+  window.handleDeptChange = async function(){
+    const sel = document.getElementById("empDept");
+    if(sel.value !== "__add_new__") return;
+
+    let newDept = prompt("اكتبي اسم القسم الجديد:");
+    newDept = String(newDept||"").trim();
+
+    if(!newDept){
+      sel.value = "";
+      return;
+    }
+
+    const current = await getDepartments();
+    if(!current.includes(newDept)){
+      current.push(newDept);
+      await saveDepartments(current);
+    }
+
+    await buildDeptSelect(newDept);
+  };
+
+  window.previewFile = function(){
+    const file = document.getElementById('empPhoto').files[0];
+    if(!file) return;
+
+    const reader = new FileReader();
+    reader.onloadend = function(){
+      const previewImg = document.getElementById('previewImg');
+      const uploadIcon = document.getElementById('uploadIcon');
+
+      previewImg.src = reader.result;
+      base64Image = reader.result;
+
+      previewImg.classList.remove('hidden');
+      uploadIcon.classList.add('hidden');
+    };
+    reader.readAsDataURL(file);
+  };
+
+  window.onload = async function(){
+    // ✅ أول حاجة: عبّي الأقسام (عشان الأقسام القديمة ترجع)
+    await buildDeptSelect("");
+
+    const empToEdit = localStorage.getItem('editing_now');
+    if(empToEdit){
+      const employees = await getJSON('nour_employees', []);
+      const empData = employees.find(e => e.name == empToEdit);
+
+      if(empData){
+        document.getElementById('pageTitle').innerText = "تعديل بيانات الموظف";
+        document.getElementById('empName').value = empData.name || "";
+        await buildDeptSelect(empData.department || "");
+
+        document.getElementById('empJob').value = empData.job || "";
+        document.getElementById('empNationalID').value = empData.nationalID || "";
+        document.getElementById('empAge').value = empData.age || "";
+        document.getElementById('empStatus').value = empData.status || "";
+        document.getElementById('empType').value = empData.type || "";
+        document.getElementById('salaryMonthly').value = empData.baseSalary || 0;
+        document.getElementById('salaryDaily').value = empData.dailyRate || 0;
+        document.getElementById('empStartDate').value = empData.startDate || "";
+
+        if(empData.photo){
+          base64Image = empData.photo;
+
+          const previewImg = document.getElementById('previewImg');
+          const uploadIcon = document.getElementById('uploadIcon');
+
+          previewImg.src = empData.photo;
+          previewImg.classList.remove('hidden');
+          uploadIcon.classList.add('hidden');
+        }
+      }
+    }
+  };
+
+  window.saveEmployeeData = async function(){
+    const employees = await getJSON('nour_employees', []);
+    const empToEdit = localStorage.getItem('editing_now');
+
+    let deptVal = document.getElementById('empDept').value;
+    if(deptVal === "__add_new__") deptVal = "";
+
+    const existing = empToEdit ? employees.find(e => e.name == empToEdit) : null;
+
+    const employee = {
+      id: empToEdit ? existing?.id : "emp_" + Date.now(),
+      photo: base64Image,
+      name: document.getElementById('empName').value.trim(),
+      department: deptVal,
+      job: document.getElementById('empJob').value,
+      nationalID: document.getElementById('empNationalID').value,
+      age: document.getElementById('empAge').value,
+      status: document.getElementById('empStatus').value,
+      type: document.getElementById('empType').value,
+      baseSalary: Number(document.getElementById('salaryMonthly').value) || 0,
+      dailyRate: Number(document.getElementById('salaryDaily').value) || 0,
+      startDate: document.getElementById('empStartDate').value,
+
+      // نحافظ على القديم لو تعديل
+      vacationBalance: empToEdit ? (existing?.vacationBalance ?? 21) : 21,
+      leaveDates: empToEdit ? (existing?.leaveDates || []) : [],
+      loans: empToEdit ? (existing?.loans || 0) : 0,
+      absentDays: empToEdit ? (existing?.absentDays || 0) : 0,
+      payCycle: empToEdit ? (existing?.payCycle || 'أسبوعي') : 'أسبوعي'
+    };
+
+    if(!employee.name || !employee.department){
+      alert("لازم الاسم والقسم");
+      return;
+    }
+
+    // ✅ تأكيد حفظ القسم في قائمة الأقسام (عشان يظهر بعد كده)
+    const deptList = await getDepartments();
+    if(!deptList.includes(employee.department)){
+      deptList.push(employee.department);
+      await saveDepartments(deptList);
+    }
+
+    if(empToEdit){
+      const index = employees.findIndex(e => e.name == empToEdit);
+      if(index !== -1) employees[index] = employee;
+      localStorage.removeItem('editing_now');
+    }else{
+      employees.push(employee);
+    }
+
+    await setJSON('nour_employees', employees);
+
+    alert("تم حفظ الموظف");
+    window.location = 'employee_management.html';
+  };
+
+  window.clearAndGoBack = function(){
+    localStorage.removeItem('editing_now');
+    window.location = 'employee_management.html';
+  };
+</script>
+
+</body>
+</html>

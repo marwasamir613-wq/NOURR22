@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>شيت مرتبات نور - مروة سمير</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+  <style>
+    body { font-family: 'Cairo', sans-serif; background: #f8fafc; }
+
+    .edit-input {
+      width: 78px; background: #f1f5f9; border-radius: 10px; padding: 5px;
+      border: 1px solid #cbd5e1; text-align: center; font-weight: 900; font-size: 13px;
+      outline: none;
+    }
+    .cycle-select {
+      background: #eff6ff; border: 2px solid #dbeafe; border-radius: 10px;
+      padding: 5px 8px; font-size: 11px; font-weight: 900; color: #1e40af;
+      outline: none; cursor: pointer;
+    }
+    .footer-card { border-radius: 1.5rem; padding: 1.5rem; text-align: center; transition: all 0.3s; border: 2px solid transparent; }
+
+    /* ✅ DD/MM text */
+    .date-input {
+      background: #fff; border: 1px solid #dbeafe; border-radius: 10px; padding: 6px 10px;
+      font-size: 12px; font-weight: 900; outline: none; color: #1e40af;
+    }
+    .date-text{ direction:ltr; text-align:center; width:140px; }
+    .cal-btn{
+      width:34px;height:34px;border-radius:10px;
+      display:flex;align-items:center;justify-content:center;
+      border:1px solid #dbeafe;background:#fff;color:#1e40af;
+      cursor:pointer;
+    }
+    .cal-btn:active{transform:scale(.95)}
+
+    @media print { .no-print { display: none !important; } }
+
+    .sort-btn{
+      background:#f1f5f9;border:1px solid #e2e8f0;width:24px;height:24px;border-radius:10px;
+      display:inline-flex;align-items:center;justify-content:center;font-weight:900;cursor:pointer;margin-left:6px;
+    }
+    .sort-btn:active { transform: scale(0.92); }
+    table tbody td { font-size: 14px; }
+
+    /* banner */
+    .mode-badge{
+      border:1px solid #e2e8f0;
+      background:#fff;
+      border-radius:14px;
+      padding:10px 12px;
+      display:flex;align-items:center;gap:8px;
+      box-shadow:0 6px 20px rgba(2,6,23,.05);
+      font-weight:900;
+      font-size:12px;
+    }
+    .mode-dot{width:10px;height:10px;border-radius:99px;background:#10b981}
+    .mode-dot.saved{background:#f59e0b}
+  </style>
+</head>
+
+<body class="p-4 text-right italic font-bold">
+
+<header class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center mb-6 no-print gap-4">
+  <div class="flex items-center gap-3">
+    <button onclick="window.location.href='admin_dashboard.html'"
+            class="w-10 h-10 bg-white rounded-full shadow-sm flex items-center justify-center border active:scale-90 transition-all"
+            type="button">
+      <span class="material-icons-round text-slate-600">arrow_forward</span>
+    </button>
+    <div>
+      <h1 class="text-xl font-black italic text-blue-800 uppercase">شيت مرتبات شركة نور</h1>
+      <p class="text-[10px] text-blue-500 font-bold uppercase italic">الإدارة المالية - مروة سمير</p>
+    </div>
+  </div>
+
+  <!-- ✅ Mode badge -->
+  <div id="modeBadge" class="mode-badge">
+    <span id="modeDot" class="mode-dot"></span>
+    <span id="modeText">وضع لايف (يحسب الغيابات تلقائي)</span>
+  </div>
+
+  <!-- ✅ Date UI (DD/MM/YYYY display + hidden native date picker) -->
+  <div class="flex items-center gap-2 bg-blue-50 p-2 rounded-2xl border border-blue-100 shadow-sm flex-wrap">
+    <span class="text-[10px] text-blue-800 italic font-black">الفترة من:</span>
+
+    <div class="flex items-center gap-2">
+      <input type="text" id="startDateText" class="date-input date-text" placeholder="DD/MM/YYYY" inputmode="numeric">
+      <button class="cal-btn" id="startPickBtn" type="button" title="اختيار تاريخ">
+        <span class="material-icons-round text-[18px]">calendar_month</span>
+      </button>
+      <input type="date" id="startDate" class="hidden">
+    </div>
+
+    <span class="text-[10px] text-blue-800 italic font-black">إلى:</span>
+
+    <div class="flex items-center gap-2">
+      <input type="text" id="endDateText" class="date-input date-text" placeholder="DD/MM/YYYY" inputmode="numeric">
+      <button class="cal-btn" id="endPickBtn" type="button" title="اختيار تاريخ">
+        <span class="material-icons-round text-[18px]">calendar_month</span>
+      </button>
+      <input type="date" id="endDate" class="hidden">
+    </div>
+
+    <button id="btnCalc"
+            class="bg-blue-600 text-white px-4 py-2 rounded-xl text-[10px] font-black shadow-lg active:scale-95"
+            type="button">
+      تحديث الحسابات
+    </button>
+  </div>
+
+  <div class="flex gap-2 flex-wrap">
+    <!-- ✅ New sheet -->
+    <button id="btnNewSheet"
+            class="bg-white text-slate-900 px-4 py-2 rounded-xl text-[10px] font-black shadow-lg flex items-center gap-2 border active:scale-95"
+            type="button">
+      <span class="material-icons-round text-sm">note_add</span> فتح شيت جديد
+    </button>
+
+    <!-- ✅ Save snapshot -->
+    <button id="btnSavePeriod"
+            class="bg-emerald-600 text-white px-4 py-2 rounded-xl text-[10px] font-black shadow-lg flex items-center gap-2 active:scale-95"
+            type="button">
+      <span class="material-icons-round text-sm">save</span> حفظ المرتبات
+    </button>
+
+    <button onclick="downloadPDF()"
+            class="bg-blue-600 text-white px-4 py-2 rounded-xl text-[10px] font-black shadow-lg flex items-center gap-2 active:scale-95"
+            type="button">
+      <span class="material-icons-round text-sm">save_alt</span> حفظ PDF
+    </button>
+    <button onclick="window.print()"
+            class="bg-slate-800 text-white px-4 py-2 rounded-xl text-[10px] font-black shadow-lg flex items-center gap-2 active:scale-95"
+            type="button">
+      <span class="material-icons-round text-sm">print</span> طباعة
+    </button>
+  </div>
+</header>
+
+<div id="salarySheetContent">
+  <main class="max-w-full mx-auto bg-white rounded-[2.5rem] shadow-xl overflow-x-auto border border-blue-100 mb-6 text-center">
+    <table class="w-full text-right text-[10px] border-collapse min-w-[1400px]">
+      <thead class="bg-blue-600 text-white font-black italic uppercase">
+      <tr>
+        <th class="p-5 text-center border-l border-blue-500">ت</th>
+        <th class="p-5 text-right border-l border-blue-500">الموظف</th>
+        <th class="p-5">دورة القبض</th>
+        <th class="p-5 bg-blue-500/50">الراتب الأساسي (شهري)</th>
+        <th class="p-5">الراتب المستحق</th>
+        <th class="p-5 bg-blue-500/30">اليومية</th>
+        <th class="p-5">أيام الغياب</th>
+        <th class="p-5 bg-blue-700">سعر الغياب</th>
+        <th class="p-5">التأمينات</th>
+        <th class="p-5 bg-blue-50/20">سلفة (يدوي)</th>
+        <th class="p-5">جزاءات</th>
+        <th class="p-5 bg-blue-900 text-white">الصافي النهائي</th>
+        <th class="p-5 bg-slate-800 text-emerald-400 font-black border-r border-slate-700">متبقي السلفيات</th>
+      </tr>
+      </thead>
+      <tbody id="tbody" class="font-bold italic text-slate-700"></tbody>
+    </table>
+  </main>
+
+  <div class="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 no-print">
+    <div class="footer-card bg-white border-blue-500 shadow-lg shadow-blue-100">
+      <p class="text-[10px] text-blue-500 font-black uppercase mb-1">إجمالي المستحقات</p>
+      <p id="totalBefore" class="text-xl font-black text-blue-900">0 ج.م</p>
+    </div>
+    <div class="footer-card bg-white border-red-500 shadow-lg shadow-red-100">
+      <p class="text-[10px] text-red-500 font-black uppercase mb-1">إجمالي الخصومات</p>
+      <p id="totalDeductions" class="text-xl font-black text-red-700">0 ج.م</p>
+    </div>
+    <div class="footer-card bg-blue-900 text-white shadow-2xl shadow-blue-300 border-none">
+      <p class="text-[10px] text-white/70 font-bold uppercase mb-1">صافي المنصرف العام</p>
+      <p id="totalFinal" class="text-xl font-black underline decoration-double">0 ج.م</p>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ======================
+  // Storage Keys
+  // ======================
+  const EMP_KEY   = 'nour_employees';
+  const ATT_KEY   = 'attendance_logs';
+  const ORDER_KEY = 'salary_sheet_order';
+  const HIST_KEY  = 'nour_salary_history_v2'; // ✅ snapshot per period
+
+  // ======================
+  // Global mode
+  // ======================
+  let CURRENT_MODE = 'live'; // 'live' | 'saved'
+  let CURRENT_SNAPSHOT = null;
+
+  function setMode(mode, savedAtISO){
+    CURRENT_MODE = mode;
+    const dot = document.getElementById('modeDot');
+    const txt = document.getElementById('modeText');
+
+    if(mode === 'saved'){
+      dot.classList.add('saved');
+      const t = savedAtISO ? new Date(savedAtISO) : null;
+      const stamp = t ? `${String(t.getDate()).padStart(2,'0')}/${String(t.getMonth()+1).padStart(2,'0')}/${t.getFullYear()} ${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}` : '';
+      txt.textContent = `عرض محفوظ (كما تم حفظه) ${stamp ? '— ' + stamp : ''}`;
+    }else{
+      dot.classList.remove('saved');
+      txt.textContent = 'وضع لايف (يحسب الغيابات تلقائي)';
+    }
+  }
+
+  // ======================
+  // Date helpers (DD/MM/YYYY)
+  // ======================
+  function isoToDDMM(iso){
+    if(!iso) return '';
+    const [y,m,d] = iso.split('-');
+    if(!y||!m||!d) return '';
+    return `${d}/${m}/${y}`;
+  }
+  function ddmmToISO(txt){
+    if(!txt) return '';
+    const s = String(txt).trim().replace(/\s+/g,'');
+    const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if(!m) return '';
+    let dd = Number(m[1]), mm = Number(m[2]), yy = Number(m[3]);
+    if(mm < 1 || mm > 12 || dd < 1 || dd > 31) return '';
+    const iso = `${yy}-${String(mm).padStart(2,'0')}-${String(dd).padStart(2,'0')}`;
+    const test = new Date(iso);
+    if(isNaN(test.getTime())) return '';
+    if(test.getUTCFullYear() !== yy || (test.getUTCMonth()+1) !== mm || test.getUTCDate() !== dd) return '';
+    return iso;
+  }
+  function setDateUI(isoStart, isoEnd){
+    document.getElementById('startDate').value = isoStart;
+    document.getElementById('endDate').value = isoEnd;
+    document.getElementById('startDateText').value = isoToDDMM(isoStart);
+    document.getElementById('endDateText').value = isoToDDMM(isoEnd);
+  }
+  function syncTextToHidden(which){
+    const txt = document.getElementById(which+'DateText').value;
+    const iso = ddmmToISO(txt);
+    if(iso){
+      document.getElementById(which+'Date').value = iso;
+      openPeriod(); // ✅ افتح الفترة (saved لو موجود وإلا live)
+    }
+  }
+
+  // ======================
+  // Numbers
+  // ======================
+  function normalizeNumber(value) {
+    if (value === null || value === undefined) return '0';
+    let s = String(value).trim();
+    const ar = '٠١٢٣٤٥٦٧٨٩';
+    s = s.replace(/[٠-٩]/g, d => String(ar.indexOf(d)));
+    s = s.replace(/,/g, '').replace(/[^\d.\-]/g, '');
+    if (s === '' || s === '-' || s === '.' || s === '-.') return '0';
+    return s;
+  }
+  function num(v) {
+    const n = parseFloat(normalizeNumber(v));
+    return isNaN(n) ? 0 : n;
+  }
+  function moneyBase(v){
+    let n = num(v);
+    if(Number.isFinite(n) && n > 0 && n < 100 && Math.floor(n) === n) n = n * 1000;
+    return n;
+  }
+  function fmt(n) { return Number(n || 0).toLocaleString('en-US'); }
+
+  // ======================
+  // Storage helpers
+  // ======================
+  function getEmployees() { return JSON.parse(localStorage.getItem(EMP_KEY)) || []; }
+  function setEmployees(arr) { localStorage.setItem(EMP_KEY, JSON.stringify(arr)); }
+  function getOrderMap() { return JSON.parse(localStorage.getItem(ORDER_KEY)) || []; }
+  function saveOrderMap(orderArr) { localStorage.setItem(ORDER_KEY, JSON.stringify(orderArr)); }
+
+  function getHistory(){ return JSON.parse(localStorage.getItem(HIST_KEY)) || {}; }
+  function setHistory(o){ localStorage.setItem(HIST_KEY, JSON.stringify(o)); }
+  function periodKey(s,e){ return `${s}__${e}`; }
+
+  // ======================
+  // Salary logic
+  // ======================
+  function computePeriodSalary(monthlyBase, cycle) {
+    const base = moneyBase(monthlyBase);
+    if (cycle === 'أسبوعي') return base / 4;
+    if (cycle === 'أسبوعين') return base / 2;
+    return base;
+  }
+
+  function calcAbsenceDaysForRange(attendanceLogs, empName, startDate, endDate) {
+    const today = new Date(); today.setHours(0,0,0,0);
+
+    const presentLogs = attendanceLogs.filter(log => {
+      const d = new Date(log.date); d.setHours(0,0,0,0);
+      return log.name === empName && log.type === 'حضور' && d >= startDate && d <= endDate;
+    });
+
+    const presentDays = new Set(presentLogs.map(l => {
+      const d = new Date(l.date); d.setHours(0,0,0,0);
+      return d.toISOString().slice(0,10);
+    })).size;
+
+    let elapsed = 0;
+    const t = new Date(startDate); t.setHours(0,0,0,0);
+    while (t <= endDate) {
+      if (t <= today) elapsed++;
+      t.setDate(t.getDate() + 1);
+    }
+    return Math.max(0, elapsed - presentDays);
+  }
+
+  // ======================
+  // Order move
+  // ======================
+  function moveName(name, dir) {
+    if(CURRENT_MODE === 'saved') return; // ✅ ممنوع ترتيب في وضع محفوظ
+    const employees = getEmployees();
+    let order = getOrderMap();
+    const currentNames = employees.map(x => x.name);
+    order = Array.from(new Set([...order, ...currentNames]));
+
+    const idx = order.indexOf(name);
+    const newIdx = idx + dir;
+    if (idx < 0 || newIdx < 0 || newIdx >= order.length) return;
+
+    [order[idx], order[newIdx]] = [order[newIdx], order[idx]];
+    saveOrderMap(order);
+    renderLive(); // ترتيب فقط
+  }
+
+  // ======================
+  // Persist for live sheet
+  // ======================
+  function updateEmpField(name, field, value) {
+    const employees = getEmployees();
+    const idx = employees.findIndex(e => e.name === name);
+    if (idx !== -1) {
+      employees[idx][field] = value;
+      setEmployees(employees);
+    }
+  }
+
+  // ======================
+  // Snapshot (A) — Save / Load exact
+  // ======================
+  function saveSnapshot(){
+    const s = document.getElementById('startDate').value;
+    const e = document.getElementById('endDate').value;
+    if(!s || !e) return alert('اختاري تاريخ البداية والنهاية');
+
+    if(CURRENT_MODE === 'saved'){
+      // لو عايزة تسمحي بحفظ فوق القديم، ممكن. احنا هنسمح عادي
+    }
+
+    const rows = [];
+    document.querySelectorAll('#tbody tr').forEach(tr=>{
+      rows.push({
+        name: tr.dataset.name,
+        payCycle: tr.querySelector('.cycle-select')?.value || 'أسبوعي',
+        baseSalary: moneyBase(tr.dataset.baseSalary),
+        dailyRate: moneyBase(tr.dataset.dailyRate),
+        absentDays: num(tr.dataset.absentDays),
+
+        insurance: num(tr.querySelector('.ins-input')?.value),
+        manualLoan: num(tr.querySelector('.loan-input')?.value),
+        penalties: num(tr.querySelector('.pen-input')?.value),
+
+        periodSalaryText: tr.querySelector('.cell-period')?.textContent || '',
+        absPriceText: tr.querySelector('.cell-abs-price')?.textContent || '',
+        netText: tr.querySelector('.cell-net')?.textContent || '',
+        remText: tr.querySelector('.cell-rem')?.textContent || ''
+      });
+    });
+
+    const snap = {
+      version: 1,
+      startISO: s,
+      endISO: e,
+      savedAt: new Date().toISOString(),
+      totals: {
+        totalBefore: document.getElementById('totalBefore').textContent || '',
+        totalDeductions: document.getElementById('totalDeductions').textContent || '',
+        totalFinal: document.getElementById('totalFinal').textContent || ''
+      },
+      rows
+    };
+
+    const hist = getHistory();
+    hist[periodKey(s,e)] = snap;
+    setHistory(hist);
+
+    alert('✅ تم حفظ المرتبات للفترة دي (أرشيف)');
+    // بعد الحفظ اعرضها كـ Saved
+    renderSaved(snap);
+  }
+
+  function findSnapshot(){
+    const s = document.getElementById('startDate').value;
+    const e = document.getElementById('endDate').value;
+    if(!s || !e) return null;
+    const hist = getHistory();
+    return hist[periodKey(s,e)] || null;
+  }
+
+  // ======================
+  // Render Saved (exact as saved)
+  // ======================
+  function renderSaved(snap){
+    CURRENT_SNAPSHOT = snap;
+    setMode('saved', snap.savedAt);
+
+    let html = '';
+    snap.rows.forEach((r, idx)=>{
+      html += `
+        <tr class="border-b border-blue-50 bg-amber-50/20 font-bold italic text-center"
+            data-name="${r.name}"
+            data-base-salary="${moneyBase(r.baseSalary)}"
+            data-daily-rate="${moneyBase(r.dailyRate)}"
+            data-absent-days="${num(r.absentDays)}">
+          <td class="p-5 text-center border-l border-blue-50 font-black text-slate-600">${idx + 1}</td>
+
+          <td class="p-5 font-black text-slate-800 text-right border-l">
+            <div class="flex items-center justify-between gap-2">
+              <span>${r.name}</span>
+              <div class="flex items-center">
+                <button class="sort-btn opacity-40 cursor-not-allowed" type="button" disabled>↑</button>
+                <button class="sort-btn opacity-40 cursor-not-allowed" type="button" disabled>↓</button>
+              </div>
+            </div>
+          </td>
+
+          <td class="p-5 text-center">
+            <select class="cycle-select opacity-70" disabled>
+              <option selected>${r.payCycle || 'أسبوعي'}</option>
+            </select>
+          </td>
+
+          <td class="p-5 text-blue-400">${fmt(r.baseSalary)}</td>
+          <td class="p-5 font-black text-blue-700 cell-period">${r.periodSalaryText || ''}</td>
+
+          <td class="p-5 text-blue-500">${fmt(r.dailyRate)}</td>
+          <td class="p-5 text-red-500">${num(r.absentDays)}</td>
+
+          <td class="p-5 bg-red-50 text-red-600 cell-abs-price">${r.absPriceText || ''}</td>
+
+          <td class="p-5">
+            <input type="text" class="edit-input ins-input opacity-70" value="${num(r.insurance)}" disabled>
+          </td>
+
+          <td class="p-5 bg-blue-50">
+            <input type="text" class="edit-input loan-input opacity-70" value="${num(r.manualLoan)}" disabled>
+          </td>
+
+          <td class="p-5">
+            <input type="text" class="edit-input pen-input opacity-70" value="${num(r.penalties)}" disabled>
+          </td>
+
+          <td class="p-5 bg-blue-900 text-white font-black cell-net">${r.netText || ''}</td>
+          <td class="p-5 bg-slate-800 text-emerald-400 font-black cell-rem">${r.remText || ''}</td>
+        </tr>
+      `;
+    });
+
+    document.getElementById('tbody').innerHTML = html;
+
+    // Totals exact
+    document.getElementById('totalBefore').textContent = snap.totals?.totalBefore || '0 ج.م';
+    document.getElementById('totalDeductions').textContent = snap.totals?.totalDeductions || '0 ج.م';
+    document.getElementById('totalFinal').textContent = snap.totals?.totalFinal || '0 ج.م';
+  }
+
+  // ======================
+  // Render Live (calculate from attendance)
+  // ======================
+  function recalcRowLive(tr){
+    const baseMonthly = moneyBase(tr.dataset.baseSalary);
+    const dailyRate   = moneyBase(tr.dataset.dailyRate);
+    const absentDays  = num(tr.dataset.absentDays);
+
+    const cycle = tr.querySelector('.cycle-select')?.value || 'أسبوعي';
+    const periodSalary = computePeriodSalary(baseMonthly, cycle);
+
+    const absencePrice = absentDays * dailyRate;
+
+    const insurance  = num(tr.querySelector('.ins-input')?.value);
+    const manualLoan = num(tr.querySelector('.loan-input')?.value);
+    const penalties  = num(tr.querySelector('.pen-input')?.value);
+
+    const net = periodSalary - (absencePrice + insurance + penalties + manualLoan);
+
+    // remaining loans: لو موجود في employee.loans نخليه يتعرض، لكن manualLoan دا خصم “يدوي” من الصافي حتى لو مفيش متبقي.
+    // هنا للعرض فقط، هنجيب المتبقي من localStorage employee.loans
+    const employees = getEmployees();
+    const emp = employees.find(x => x.name === tr.dataset.name);
+    const rem = emp ? moneyBase(emp.loans) : 0;
+
+    tr.querySelector('.cell-period').textContent = fmt(periodSalary);
+    tr.querySelector('.cell-abs-price').textContent = fmt(absencePrice);
+    tr.querySelector('.cell-net').textContent = fmt(net) + ' ج.م';
+    tr.querySelector('.cell-rem').textContent = fmt(rem) + ' ج.م';
+  }
+
+  function recalcTotalsLive(){
+    let sumEarned = 0, sumDed = 0, sumNet = 0;
+
+    document.querySelectorAll('#tbody tr').forEach(tr => {
+      const baseMonthly = moneyBase(tr.dataset.baseSalary);
+      const dailyRate   = moneyBase(tr.dataset.dailyRate);
+      const absentDays  = num(tr.dataset.absentDays);
+
+      const cycle = tr.querySelector('.cycle-select')?.value || 'أسبوعي';
+      const periodSalary = computePeriodSalary(baseMonthly, cycle);
+
+      const absencePrice = absentDays * dailyRate;
+
+      const insurance  = num(tr.querySelector('.ins-input')?.value);
+      const manualLoan = num(tr.querySelector('.loan-input')?.value);
+      const penalties  = num(tr.querySelector('.pen-input')?.value);
+
+      const ded = absencePrice + insurance + penalties + manualLoan;
+      const net = periodSalary - ded;
+
+      sumEarned += periodSalary;
+      sumDed += ded;
+      sumNet += net;
+    });
+
+    document.getElementById('totalBefore').textContent = fmt(sumEarned) + ' ج.م';
+    document.getElementById('totalDeductions').textContent = fmt(sumDed) + ' ج.م';
+    document.getElementById('totalFinal').textContent = fmt(sumNet) + ' ج.م';
+  }
+
+  function renderLive(){
+    CURRENT_SNAPSHOT = null;
+    setMode('live');
+
+    const employees = getEmployees().map(e => ({
+      ...e,
+      name: e.name || '',
+      baseSalary: moneyBase(e.baseSalary),
+      dailyRate: moneyBase(e.dailyRate),
+      insurance: num(e.insurance),
+      penalties: num(e.penalties),
+      payCycle: e.payCycle || 'أسبوعي',
+      loans: moneyBase(e.loans)
+    }));
+
+    const logs = JSON.parse(localStorage.getItem(ATT_KEY)) || [];
+
+    const s = document.getElementById('startDate').value;
+    const e = document.getElementById('endDate').value;
+    if(!s || !e) return;
+
+    const start = new Date(s); start.setHours(0,0,0,0);
+    const end   = new Date(e); end.setHours(0,0,0,0);
+
+    let order = getOrderMap();
+    const names = employees.map(x => x.name);
+    order = Array.from(new Set([...order, ...names]));
+    saveOrderMap(order);
+
+    employees.sort((a,b) => order.indexOf(a.name) - order.indexOf(b.name));
+
+    let html = '';
+    employees.forEach((emp, idx)=>{
+      const absentDays = calcAbsenceDaysForRange(logs, emp.name, start, end);
+
+      html += `
+        <tr class="border-b border-blue-50 hover:bg-blue-50/40 transition-all font-bold italic text-center"
+            data-name="${emp.name}"
+            data-base-salary="${emp.baseSalary}"
+            data-daily-rate="${emp.dailyRate}"
+            data-absent-days="${absentDays}">
+          <td class="p-5 text-center border-l border-blue-50 font-black text-slate-600">${idx + 1}</td>
+
+          <td class="p-5 font-black text-slate-800 text-right border-l">
+            <div class="flex items-center justify-between gap-2">
+              <span>${emp.name}</span>
+              <div class="flex items-center">
+                <button class="sort-btn" type="button" data-action="up" data-name="${emp.name}">↑</button>
+                <button class="sort-btn" type="button" data-action="down" data-name="${emp.name}">↓</button>
+              </div>
+            </div>
+          </td>
+
+          <td class="p-5 text-center">
+            <select class="cycle-select" data-role="cycle" data-name="${emp.name}">
+              <option value="أسبوعي" ${emp.payCycle==='أسبوعي'?'selected':''}>أسبوعي</option>
+              <option value="أسبوعين" ${emp.payCycle==='أسبوعين'?'selected':''}>أسبوعين</option>
+              <option value="شهري" ${emp.payCycle==='شهري'?'selected':''}>شهري</option>
+            </select>
+          </td>
+
+          <td class="p-5 text-blue-400">${fmt(emp.baseSalary)}</td>
+          <td class="p-5 font-black text-blue-700 cell-period">0</td>
+
+          <td class="p-5 text-blue-500">${fmt(emp.dailyRate)}</td>
+          <td class="p-5 text-red-500">${absentDays}</td>
+
+          <td class="p-5 bg-red-50 text-red-600 cell-abs-price">0</td>
+
+          <td class="p-5">
+            <input type="text" inputmode="decimal"
+                   class="edit-input ins-input"
+                   value="${emp.insurance}"
+                   data-role="ins" data-name="${emp.name}">
+          </td>
+
+          <td class="p-5 bg-blue-50">
+            <input type="text" inputmode="decimal"
+                   class="edit-input loan-input"
+                   value="0"
+                   data-role="loan" data-name="${emp.name}">
+          </td>
+
+          <td class="p-5">
+            <input type="text" inputmode="decimal"
+                   class="edit-input pen-input"
+                   value="${emp.penalties}"
+                   data-role="pen" data-name="${emp.name}">
+          </td>
+
+          <td class="p-5 bg-blue-900 text-white font-black cell-net">0 ج.م</td>
+          <td class="p-5 bg-slate-800 text-emerald-400 font-black cell-rem">${fmt(emp.loans)} ج.م</td>
+        </tr>
+      `;
+    });
+
+    document.getElementById('tbody').innerHTML = html;
+    document.querySelectorAll('#tbody tr').forEach(tr => recalcRowLive(tr));
+    recalcTotalsLive();
+  }
+
+  // ======================
+  // Period open logic (A)
+  // ======================
+  function openPeriod(){
+    const snap = findSnapshot();
+    if(snap){
+      renderSaved(snap);
+    }else{
+      renderLive();
+    }
+  }
+
+  // ======================
+  // Events
+  // ======================
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-action]');
+    if (!btn) return;
+
+    const name = btn.dataset.name;
+    const action = btn.dataset.action;
+    if (action === 'up') moveName(name, -1);
+    if (action === 'down') moveName(name, 1);
+  });
+
+  document.addEventListener('input', (e) => {
+    const el = e.target;
+
+    if(el?.id === 'startDateText') return syncTextToHidden('start');
+    if(el?.id === 'endDateText') return syncTextToHidden('end');
+
+    if(CURRENT_MODE === 'saved') return; // ✅ ممنوع تعديل في محفوظ
+
+    if (!el?.dataset?.role) return;
+    const tr = el.closest('tr');
+    if (!tr) return;
+
+    recalcRowLive(tr);
+    recalcTotalsLive();
+  });
+
+  document.addEventListener('change', (e) => {
+    const el = e.target;
+
+    if(el?.id === 'startDate'){
+      document.getElementById('startDateText').value = isoToDDMM(el.value);
+      openPeriod();
+      return;
+    }
+    if(el?.id === 'endDate'){
+      document.getElementById('endDateText').value = isoToDDMM(el.value);
+      openPeriod();
+      return;
+    }
+
+    if(CURRENT_MODE === 'saved') return;
+
+    if (!el?.dataset?.role) return;
+    const role = el.dataset.role;
+    const name = el.dataset.name;
+
+    if (role === 'cycle') updateEmpField(name, 'payCycle', el.value);
+    if (role === 'ins') updateEmpField(name, 'insurance', num(el.value));
+    if (role === 'pen') updateEmpField(name, 'penalties', num(el.value));
+
+    // manual loan: ✅ يتخصم من الصافي دايمًا، ولو فيه متبقي سلفيات يتخصم منه، ولو مفيش عادي (الصافي فقط)
+    if (role === 'loan') {
+      const employees = getEmployees();
+      const idx = employees.findIndex(x => x.name === name);
+      if(idx !== -1){
+        const manual = Math.max(0, num(el.value));
+        const currentRem = Math.max(0, moneyBase(employees[idx].loans));
+        // خصم من المتبقي لو موجود
+        employees[idx].loans = Math.max(0, currentRem - manual);
+        setEmployees(employees);
+      }
+    }
+
+    // اعادة حساب الصف/الاجمالي
+    const tr = el.closest('tr');
+    if(tr){
+      recalcRowLive(tr);
+      recalcTotalsLive();
+    }
+  });
+
+  // ======================
+  // Buttons
+  // ======================
+  function promptPeriodDDMM(){
+    const s = prompt('اكتب تاريخ البداية بصيغة DD/MM/YYYY');
+    if(!s) return null;
+    const e = prompt('اكتب تاريخ النهاية بصيغة DD/MM/YYYY');
+    if(!e) return null;
+
+    const isoS = ddmmToISO(s);
+    const isoE = ddmmToISO(e);
+    if(!isoS || !isoE) { alert('❌ صيغة التاريخ غلط. استخدمي DD/MM/YYYY'); return null; }
+    if(new Date(isoS) > new Date(isoE)) { alert('❌ تاريخ البداية لازم يكون قبل النهاية'); return null; }
+    return {isoS, isoE};
+  }
+
+  function openNewSheet(){
+    const p = promptPeriodDDMM();
+    if(!p) return;
+    setDateUI(p.isoS, p.isoE);
+    renderLive(); // ✅ شيت جديد لايف
+  }
+
+  function downloadPDF() {
+    const opt = {
+      margin: 0.1,
+      filename: 'مرتبات_نور.pdf',
+      html2canvas: { scale: 2 },
+      jsPDF: { unit: 'in', format: 'a3', orientation: 'landscape' }
+    };
+    html2pdf().set(opt).from(document.getElementById('salarySheetContent')).save();
+  }
+
+  // ======================
+  // Init
+  // ======================
+  window.onload = function () {
+    const todayISO = new Date().toISOString().split('T')[0];
+    setDateUI(todayISO, todayISO);
+
+    document.getElementById('startPickBtn').addEventListener('click', ()=>{
+      const inp = document.getElementById('startDate');
+      if(inp.showPicker) inp.showPicker(); else inp.click();
+    });
+    document.getElementById('endPickBtn').addEventListener('click', ()=>{
+      const inp = document.getElementById('endDate');
+      if(inp.showPicker) inp.showPicker(); else inp.click();
+    });
+
+    document.getElementById('btnCalc').addEventListener('click', openPeriod);
+    document.getElementById('btnSavePeriod').addEventListener('click', saveSnapshot);
+    document.getElementById('btnNewSheet').addEventListener('click', openNewSheet);
+
+    openPeriod(); // ✅ لو محفوظ يفتحه، لو لايف يحسبه
+  };
+</script>
+
+<script type="module" src="js/cloud-sync.js"></script>
+</body>
+</html>

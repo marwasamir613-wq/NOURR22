@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>ماسح QR - شركة نور</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet"/>
+
+    <!-- مكتبة قراءة QR الحقيقية -->
+    <script src="https://unpkg.com/html5-qrcode"></script>
+
+    <style>
+        body { font-family: 'Cairo', sans-serif; background: #000; margin: 0; overflow: hidden; }
+        .scan-container { position: relative; width: 100%; height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        #preview { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; }
+        .overlay { position: absolute; inset: 0; z-index: 10; display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: 40px 20px; background: rgba(0,0,0,0.3); }
+        .scan-box { width: 260px; height: 260px; border: 4px solid #137fec; border-radius: 40px; position: relative; box-shadow: 0 0 30px rgba(19, 127, 236, 0.6); }
+        .scan-line { position: absolute; width: 100%; height: 3px; background: #137fec; top: 0; animation: scan 2s linear infinite; box-shadow: 0 0 15px #137fec; }
+        @keyframes scan { 0% { top: 0; } 100% { top: 100%; } }
+    </style>
+</head>
+<body>
+
+<div class="scan-container">
+
+    <!-- مهم جداً: id لازم يكون div مش video -->
+    <div id="preview"></div>
+
+    <div class="overlay">
+        <header class="w-full flex items-center justify-between text-white max-w-md mx-auto">
+            <button onclick="window.location.href='home.html'" class="w-12 h-12 bg-white/10 backdrop-blur-md rounded-full flex items-center justify-center active:scale-90">
+                <span class="material-icons">close</span>
+            </button>
+            <h1 class="text-lg font-black italic">نظام البصمة الذكي</h1>
+            <div class="w-12"></div>
+        </header>
+
+        <div class="scan-box">
+            <div class="scan-line"></div>
+        </div>
+
+        <div class="bg-white/10 backdrop-blur-xl text-white p-6 rounded-[2rem] text-center max-w-xs border border-white/20 shadow-2xl">
+            <p id="status_text" class="text-xs font-black mb-1 italic text-blue-400 uppercase">
+                جاري تهيئة الكاميرا...
+            </p>
+            <p class="text-sm font-bold opacity-90">
+                وجه الكود للمربع لتسجيل الحضور
+            </p>
+        </div>
+    </div>
+</div>
+
+<script>
+function initScanner() {
+
+    const html5QrCode = new Html5Qrcode("preview");
+
+    Html5Qrcode.getCameras().then(devices => {
+        if (devices && devices.length) {
+
+            html5QrCode.start(
+                devices[0].id,
+                {
+                    fps: 10,
+                    qrbox: 250
+                },
+                (decodedText) => {
+                    verifyQRCode(decodedText, html5QrCode);
+                }
+            );
+
+            document.getElementById("status_text").innerText = "الماسح جاهز للعمل";
+        }
+    }).catch(err => {
+        alert("فعل الكاميرا!");
+        window.location.href = "home.html";
+    });
+}
+
+function verifyQRCode(scannedData, scanner) {
+
+    const secretKey = "NOUR_LIGHTING_2026";
+    const currentTimestamp = Math.floor(Date.now() / 20000);
+    const expectedPrefix = `ATTENDANCE_${secretKey}_`;
+
+    if (!scannedData.startsWith(expectedPrefix)) {
+        alert("❌ الكود غير تابع لشركة نور");
+        return;
+    }
+
+    const scannedTimestamp = parseInt(scannedData.replace(expectedPrefix, ''));
+
+    if (scannedTimestamp !== currentTimestamp) {
+        alert("⛔ الكود منتهي الصلاحية");
+        return;
+    }
+
+    scanner.stop();
+
+    alert("✅ تم تسجيل الحضور بنجاح");
+
+    window.location.href = "home.html";
+}
+
+window.onload = initScanner;
+</script>
+
+<script type="module" src="js/cloud-sync.js"></script>
+</body>
+</html>

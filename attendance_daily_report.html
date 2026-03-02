@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>تقرير حضور وانصراف - نور</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+  <style>
+    body { font-family: 'Cairo', sans-serif; background:#f8fafc; color:#0f172a; }
+
+    .card { background:#fff; border:1px solid #eef2ff; border-radius:2rem; box-shadow:0 10px 30px rgba(2,6,23,.06); }
+    .btn { border-radius:1rem; padding:10px 14px; font-weight:900; font-size:12px; }
+    .btn-blue { background:#2563eb; color:#fff; }
+    .btn-dark { background:#0f172a; color:#fff; }
+    .btn-white { background:#fff; border:1px solid #e2e8f0; color:#0f172a; }
+    .btn-emerald { background:#10b981; color:#fff; }
+
+    .tbl th { background:#137fec; color:#fff; font-size:11px; font-weight:900; padding:12px; }
+    .tbl td { padding:10px; font-size:12px; font-weight:900; border-bottom:1px solid #f1f5f9; text-align:center; }
+    .tbl tr:hover td { background:#f8fafc; }
+    .stickyCol { position: sticky; right: 0; background:#fff; z-index:10; }
+
+    @media print { .no-print{display:none!important} body{background:#fff} }
+  </style>
+</head>
+
+<body class="p-4 pb-24 italic">
+
+  <!-- HEADER -->
+  <header class="max-w-6xl mx-auto flex items-center justify-between gap-3 mb-6 no-print">
+    <div class="flex items-center gap-3">
+      <button onclick="history.back()" class="w-10 h-10 bg-white rounded-full shadow-sm flex items-center justify-center border border-slate-100 active:scale-95 transition-all">
+        <span class="material-icons-round">arrow_forward</span>
+      </button>
+      <div>
+        <h1 class="text-lg font-black text-slate-800 uppercase italic">تقرير حضور وانصراف</h1>
+        <p class="text-[10px] text-slate-400 font-black uppercase italic">يعرض تسجيلات QR لليوم المختار</p>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-2 flex-wrap">
+      <input type="date" id="dayPicker" class="p-2 border rounded-xl text-[11px] font-black outline-none">
+      <button id="btnRefresh" class="btn btn-blue" type="button">تحديث</button>
+      <button id="btnSaveDay" class="btn btn-emerald" type="button">حفظ اليوم</button>
+      <button onclick="window.print()" class="btn btn-dark" type="button">طباعة</button>
+      <button onclick="downloadPDF()" class="btn btn-blue" type="button">PDF</button>
+    </div>
+  </header>
+
+  <!-- CONTENT TO PDF -->
+  <div id="pdfContent" class="max-w-6xl mx-auto space-y-4">
+
+    <!-- SUMMARY -->
+    <div class="card p-5 flex items-center justify-between flex-wrap gap-4">
+      <div>
+        <p class="text-[10px] text-slate-400 font-black uppercase italic">اليوم</p>
+        <p id="dayTitle" class="text-xl font-black text-slate-900">—</p>
+      </div>
+
+      <div class="flex gap-3 flex-wrap">
+        <div class="bg-slate-50 border border-slate-100 rounded-2xl p-4 text-center min-w-[170px]">
+          <p class="text-[10px] text-slate-400 font-black uppercase italic">عدد الموظفين</p>
+          <p id="countEmployees" class="text-2xl font-black text-slate-900">0</p>
+        </div>
+        <div class="bg-slate-50 border border-slate-100 rounded-2xl p-4 text-center min-w-[170px]">
+          <p class="text-[10px] text-slate-400 font-black uppercase italic">إجمالي الحركات</p>
+          <p id="countLogs" class="text-2xl font-black text-blue-700">0</p>
+        </div>
+        <div class="bg-slate-900 rounded-2xl p-4 text-center min-w-[170px] text-white">
+          <p class="text-[10px] opacity-60 font-black uppercase italic">وضع العرض</p>
+          <p id="modeText" class="text-base font-black text-blue-300">لايف</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- TABLE -->
+    <div class="card p-4">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-sm font-black text-slate-700 uppercase italic">تفاصيل اليوم</h2>
+        <div class="text-[10px] font-black text-slate-400 uppercase italic" id="archiveHint"></div>
+      </div>
+
+      <div class="overflow-x-auto rounded-2xl border border-slate-100">
+        <table class="tbl w-full text-right border-collapse">
+          <thead>
+            <tr>
+              <th class="stickyCol">الموظف</th>
+              <th>حضور (أول مرة)</th>
+              <th>انصراف (آخر مرة)</th>
+              <th>عدد الحركات</th>
+              <th>تفاصيل</th>
+            </tr>
+          </thead>
+          <tbody id="rowsBody">
+            <tr><td colspan="5" class="p-6 text-slate-400 font-black">لا يوجد بيانات لعرضها</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- RAW LOGS (اختياري للعرض) -->
+      <div class="mt-4">
+        <button id="toggleRaw" class="btn btn-white no-print" type="button">إظهار السجل الكامل</button>
+        <div id="rawWrap" class="hidden mt-3 overflow-x-auto rounded-2xl border border-slate-100">
+          <table class="tbl w-full text-right border-collapse">
+            <thead>
+              <tr>
+                <th class="stickyCol">الموظف</th>
+                <th>النوع</th>
+                <th>الوقت</th>
+                <th>التاريخ</th>
+                <th>المصدر</th>
+              </tr>
+            </thead>
+            <tbody id="rawBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+<script>
+  const ATT_KEY = 'attendance_logs';
+  const ARCH_KEY = 'nour_attendance_archive_v1'; // ✅ أرشيف يومي (Snapshot)
+
+  function pad2(n){ return String(n).padStart(2,'0'); }
+  function isoToAr(iso){
+    if(!iso) return '—';
+    const d = new Date(iso + 'T00:00:00');
+    return `${pad2(d.getDate())}/${pad2(d.getMonth()+1)}/${d.getFullYear()}`;
+  }
+
+  function getLogs(){
+    return JSON.parse(localStorage.getItem(ATT_KEY)) || [];
+  }
+  function getArchive(){
+    return JSON.parse(localStorage.getItem(ARCH_KEY)) || {};
+  }
+  function setArchive(obj){
+    localStorage.setItem(ARCH_KEY, JSON.stringify(obj));
+  }
+
+  function normalizeTime(t){
+    // بعض الأوقات بتبقى عربي، هنسيبها كـ string للعرض
+    return (t ?? '').toString();
+  }
+
+  function groupDay(logs, isoDay){
+    const dayLogs = logs
+      .filter(l => l && l.date === isoDay && l.name)
+      .map(l => ({
+        name: String(l.name),
+        type: String(l.type || ''),
+        time: normalizeTime(l.time),
+        date: String(l.date),
+        source: String(l.source || ''),
+        createdAt: l.createdAt || null
+      }));
+
+    // group per employee
+    const map = new Map();
+    for(const l of dayLogs){
+      if(!map.has(l.name)) map.set(l.name, []);
+      map.get(l.name).push(l);
+    }
+
+    // sort each group by createdAt if exists else by time string
+    for(const [name, arr] of map.entries()){
+      arr.sort((a,b)=>{
+        const ta = a.createdAt ? Date.parse(a.createdAt) : 0;
+        const tb = b.createdAt ? Date.parse(b.createdAt) : 0;
+        if(ta && tb) return ta - tb;
+        return String(a.time).localeCompare(String(b.time));
+      });
+      map.set(name, arr);
+    }
+
+    return { dayLogs, map };
+  }
+
+  function computeSummary(map){
+    const rows = [];
+    for(const [name, arr] of map.entries()){
+      const firstIn = arr.find(x => x.type === 'حضور')?.time || '—';
+      const lastOut = [...arr].reverse().find(x => x.type === 'انصراف')?.time || '—';
+      rows.push({
+        name,
+        firstIn,
+        lastOut,
+        count: arr.length,
+        details: arr.map(x => `${x.type || '-'}: ${x.time || '-'}`).join(' | ')
+      });
+    }
+    // sort alphabetically
+    rows.sort((a,b)=> a.name.localeCompare(b.name,'ar'));
+    return rows;
+  }
+
+  function render(isoDay, mode, savedAt){
+    const title = isoToAr(isoDay);
+    document.getElementById('dayTitle').textContent = title;
+    document.getElementById('modeText').textContent = (mode === 'saved')
+      ? `محفوظ — ${savedAt ? new Date(savedAt).toLocaleString('ar-EG') : ''}`
+      : 'لايف';
+
+    const archiveHint = document.getElementById('archiveHint');
+    archiveHint.textContent = (mode === 'saved')
+      ? 'عرض نسخة محفوظة (لا تتغير)'
+      : 'عرض مباشر من سجل QR';
+
+    const logs = (mode === 'saved')
+      ? (getArchive()[isoDay]?.logs || [])
+      : getLogs();
+
+    const sourceLogs = (mode === 'saved') ? logs : logs; // نفس المتغير
+
+    const { dayLogs, map } = groupDay(sourceLogs, isoDay);
+    const rows = computeSummary(map);
+
+    document.getElementById('countEmployees').textContent = String(rows.length);
+    document.getElementById('countLogs').textContent = String(dayLogs.length);
+
+    const body = document.getElementById('rowsBody');
+    if(rows.length === 0){
+      body.innerHTML = `<tr><td colspan="5" class="p-6 text-slate-400 font-black">لا يوجد تسجيلات لهذا اليوم</td></tr>`;
+    }else{
+      body.innerHTML = rows.map(r=>`
+        <tr>
+          <td class="stickyCol font-black">${r.name}</td>
+          <td class="text-emerald-600 font-black">${r.firstIn}</td>
+          <td class="text-red-600 font-black">${r.lastOut}</td>
+          <td class="text-blue-700 font-black">${r.count}</td>
+          <td class="text-[11px] text-slate-600">${r.details}</td>
+        </tr>
+      `).join('');
+    }
+
+    // RAW
+    const rawBody = document.getElementById('rawBody');
+    rawBody.innerHTML = dayLogs.map(l=>`
+      <tr>
+        <td class="stickyCol font-black">${l.name}</td>
+        <td class="${l.type==='حضور'?'text-emerald-600':'text-red-600'} font-black">${l.type || '-'}</td>
+        <td class="font-black">${l.time || '-'}</td>
+        <td class="font-black">${l.date || '-'}</td>
+        <td class="text-slate-500 font-black">${l.source || '-'}</td>
+      </tr>
+    `).join('');
+  }
+
+  function loadDay(){
+    const isoDay = document.getElementById('dayPicker').value;
+    if(!isoDay) return;
+
+    const arch = getArchive();
+    if(arch[isoDay]){
+      render(isoDay, 'saved', arch[isoDay].savedAt);
+    }else{
+      render(isoDay, 'live');
+    }
+  }
+
+  function saveDaySnapshot(){
+    const isoDay = document.getElementById('dayPicker').value;
+    if(!isoDay) return alert('اختاري اليوم');
+
+    const logs = getLogs().filter(l => l && l.date === isoDay);
+    if(logs.length === 0) return alert('لا يوجد تسجيلات لهذا اليوم لحفظها');
+
+    const arch = getArchive();
+    arch[isoDay] = {
+      savedAt: new Date().toISOString(),
+      logs: logs
+    };
+    setArchive(arch);
+
+    alert('✅ تم حفظ اليوم للأرشيف');
+    render(isoDay, 'saved', arch[isoDay].savedAt);
+  }
+
+  function downloadPDF(){
+    const isoDay = document.getElementById('dayPicker').value || 'today';
+    const opt = {
+      margin: 0.2,
+      filename: `تقرير_حضور_انصراف_${isoDay}.pdf`,
+      html2canvas: { scale: 2 },
+      jsPDF: { unit: 'in', format: 'a4', orientation: 'landscape' }
+    };
+    html2pdf().set(opt).from(document.getElementById('pdfContent')).save();
+  }
+
+  // init
+  window.onload = async function(){
+    // ✅ استنى السحابة قبل القراءة
+    if(window.cloudSyncReady){
+      try { await window.cloudSyncReady; } catch(e){}
+    }
+
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('dayPicker').value = today;
+
+    document.getElementById('btnRefresh').addEventListener('click', loadDay);
+    document.getElementById('btnSaveDay').addEventListener('click', saveDaySnapshot);
+
+    document.getElementById('dayPicker').addEventListener('change', loadDay);
+
+    document.getElementById('toggleRaw').addEventListener('click', ()=>{
+      const wrap = document.getElementById('rawWrap');
+      const hidden = wrap.classList.contains('hidden');
+      wrap.classList.toggle('hidden');
+      document.getElementById('toggleRaw').textContent = hidden ? 'إخفاء السجل الكامل' : 'إظهار السجل الكامل';
+    });
+
+    loadDay();
+  };
+</script>
+
+<script type="module" src="js/cloud-sync.js"></script>
+</body>
+</html>

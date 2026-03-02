@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ماسح الحضور - شركة نور</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <style>
+        body { font-family: 'Cairo', sans-serif; background: #0f172a; }
+        #reader { border: none !important; }
+        #reader__dashboard_section_csr button {
+            background: #137fec !important;
+            color: white !important;
+            padding: 10px 20px !important;
+            border-radius: 12px !important;
+            font-family: 'Cairo', sans-serif !important;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center p-4">
+
+    <div class="w-full max-w-md bg-white/10 backdrop-blur-md p-6 rounded-[2.5rem] mb-6 text-center border border-white/20">
+        <h1 class="text-2xl font-black text-white italic">ماسح حضور الموظفين</h1>
+        <p id="empGreeting" class="text-blue-300 font-bold mt-2">أهلاً بك .. جاري التحميل</p>
+    </div>
+
+    <div class="relative w-full max-w-md aspect-square bg-black rounded-[3rem] overflow-hidden border-4 border-[#137fec] shadow-2xl">
+        <div id="reader" class="w-full"></div>
+    </div>
+
+    <button onclick="window.location.href='index.html'" class="mt-8 text-white/50 font-bold flex items-center gap-2">
+        <span>الرجوع للرئيسية</span>
+    </button>
+
+    <script>
+        // التأكد إن الموظف مسجل دخول باسمه الأول
+        const loggedInUser = localStorage.getItem('logged_in_employee_name');
+        if (!loggedInUser) {
+            alert("عفواً، يجب تسجيل الدخول أولاً!");
+            window.location.href = 'login.html';
+        } else {
+            document.getElementById('empGreeting').innerText = `يا هلا يا ${loggedInUser}، وجه الكاميرا للكود`;
+        }
+
+        // تشغيل الماسح
+        const html5QrCode = new Html5Qrcode("reader");
+        const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+
+        // ✅ تحقق من QR المتغير (يقبل نافذة زمنية ± 1 خطوة = 20 ثانية)
+        function isValidCompanyQR(decodedText){
+            try{
+                const secretKey = "NOUR_LIGHTING_2026";
+                if(typeof decodedText !== "string") return false;
+                if(!decodedText.startsWith("ATTENDANCE_" + secretKey + "_")) return false;
+
+                const parts = decodedText.split("_");
+                const ts = Number(parts[parts.length - 1]);
+                if(!Number.isFinite(ts)) return false;
+
+                const nowTs = Math.floor(Date.now() / 20000);
+                return Math.abs(nowTs - ts) <= 1;
+            }catch(e){
+                return false;
+            }
+        }
+
+        html5QrCode.start({ facingMode: "environment" }, config, (decodedText) => {
+            if (isValidCompanyQR(decodedText)) { 
+                saveAttendance(loggedInUser);
+                html5QrCode.stop(); // وقف الكاميرا بعد النجاح
+            } else {
+                alert("كود غير صحيح أو منتهي! اتأكد إنك ماسح الكود الحالي لشركة نور");
+            }
+        });
+
+      
+        function saveAttendance(name) {
+            const now = new Date();
+
+            const pad = (n) => String(n).padStart(2, "0");
+            const isoDate = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
+            const timeString = now.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
+
+            // ✅ السجل الرسمي الموحد اللي باقي النظام بيعتمد عليه
+            let logs = JSON.parse(localStorage.getItem('attendance_logs')) || [];
+
+            // تحديد نوع الحركة: حضور ثم انصراف في نفس اليوم (لو آخر حركة حضور يبقى انصراف)
+            const todays = logs.filter(l => l && l.name === name && l.date === isoDate);
+            const last = todays[todays.length - 1];
+            const type = (last && last.type === 'حضور') ? 'انصراف' : 'حضور';
+
+            const entry = {
+                name: name,
+                date: isoDate,
+                time: timeString,
+                type: type,
+                source: 'qr_scanner',
+                createdAt: now.toISOString()
+            };
+
+            logs.push(entry);
+            localStorage.setItem('attendance_logs', JSON.stringify(logs));
+
+            // ✅ توافق قديم لو في صفحات بتقرأ attendance_records
+            let records = JSON.parse(localStorage.getItem('attendance_records')) || [];
+            records.push({
+                name: name,
+                date: isoDate,
+                dateAr: now.toLocaleDateString('ar-EG'),
+                time: timeString,
+                type: type
+            });
+            localStorage.setItem('attendance_records', JSON.stringify(records));
+
+            // رسالة نجاح
+            alert(`تم تسجيل ${type} بنجاح يا ${name} في تمام الساعة ${timeString}`);
+            window.location.href = 'index.html';
+        }
+    </script>
+<script type="module" src="js/cloud-sync.js"></script>
+</body>
+</html>

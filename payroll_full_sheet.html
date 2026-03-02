@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>شيت الرواتب الرسمي - نور للإضاءة</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet"/>
+    <style>
+        body { font-family: 'Cairo', sans-serif; background-color: #f8fafc; }
+        .table-container { overflow-x: auto; border-radius: 1.5rem; }
+        th { background-color: #137fec; color: white; font-weight: 700; font-size: 10px; padding: 12px; border: 1px solid #ffffff33; }
+        td { padding: 10px; font-size: 11px; font-weight: 700; border: 1px solid #f1f5f9; text-align: center; }
+        .edit-cell { cursor: pointer; outline: none; }
+        .edit-cell:focus { background: #eef6ff; color: #137fec; }
+        @media print { .no-print { display: none; } body { padding: 0; background: white; } }
+    </style>
+</head>
+<body class="p-4 pb-20">
+
+    <header class="max-w-6xl mx-auto flex items-center justify-between mb-6 no-print">
+        <div class="flex items-center gap-3">
+            <button onclick="history.back()" class="w-10 h-10 bg-white rounded-full shadow-sm flex items-center justify-center border border-slate-100"><span class="material-icons-round">arrow_forward</span></button>
+            <h1 class="text-lg font-black text-slate-800 italic uppercase">كشف الرواتب الرسمي (٩ص - ٥م)</h1>
+        </div>
+        <div class="flex items-center gap-2">
+            <input type="date" id="reportDate" class="p-2 border rounded-xl text-[10px] font-bold outline-none">
+            <button onclick="window.print()" class="w-10 h-10 bg-blue-600 text-white rounded-xl shadow-md flex items-center justify-center"><span class="material-icons-round">print</span></button>
+        </div>
+    </header>
+
+    <main class="max-w-6xl mx-auto space-y-6">
+        <div class="table-container bg-white shadow-sm border border-slate-100">
+            <table class="w-full text-right border-collapse">
+                <thead>
+                    <tr>
+                        <th class="sticky right-0 z-20">أسم الموظف</th>
+                        <th>دورة القبض</th>
+                        <th>المرتب الشهري</th>
+                        <th>الأجر اليومي</th>
+                        <th>أيام الغياب</th>
+                        <th>قيمة الغياب</th>
+                        <th>السلفيات</th>
+                        <th>الجزاءات</th>
+                        <th class="bg-blue-700">الصافي</th>
+                    </tr>
+                </thead>
+                <tbody id="fullPayrollBody">
+                </tbody>
+            </table>
+        </div>
+
+        <div class="grid grid-cols-3 gap-4">
+            <div class="bg-white p-4 rounded-3xl border-b-4 border-blue-500 shadow-sm text-center">
+                <p class="text-[9px] text-slate-400 font-bold italic mb-1 uppercase">إجمالي الأساسي</p>
+                <p id="totalBaseDisplay" class="text-lg font-black text-slate-800">٠ ج.م</p>
+            </div>
+            <div class="bg-white p-4 rounded-3xl border-b-4 border-red-500 shadow-sm text-center">
+                <p class="text-[9px] text-slate-400 font-bold italic mb-1 uppercase">إجمالي المخصوم</p>
+                <p id="totalDeductedDisplay" class="text-lg font-black text-red-500">٠ ج.م</p>
+            </div>
+            <div class="bg-slate-900 p-4 rounded-3xl shadow-xl text-center text-white">
+                <p class="text-[9px] opacity-60 font-bold italic mb-1 uppercase">التوتال الصافي للصرف</p>
+                <p id="finalTotalDisplay" class="text-lg font-black italic text-blue-400">٠ ج.م</p>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // ✅ Helper: رقم آمن
+        function n(v){
+            const x = Number(String(v ?? "").replace(/[^\d.\-]/g, ""));
+            return Number.isFinite(x) ? x : 0;
+        }
+
+        // ✅ توحيد حساب دورة القبض زي main (لو مش موجودة نخليها أسبوعي)
+        function computePeriodSalary(monthlyBase, cycle){
+            const base = n(monthlyBase);
+            if (cycle === 'أسبوعي') return base / 4;
+            if (cycle === 'أسبوعين') return base / 2;
+            return base; // شهري
+        }
+
+        async function loadFullSheet() {
+            // ✅ مهم جدًا: استنى Firebase Sync لو موجود
+            if (window.cloudSyncReady) {
+                try { await window.cloudSyncReady; } catch(e) {}
+            }
+
+            // ✅ قراءة الموظفين من المفتاح الأساسي فقط
+            const employees = JSON.parse(localStorage.getItem('nour_employees')) || [];
+            const tbody = document.getElementById('fullPayrollBody');
+            document.getElementById('reportDate').value = new Date().toISOString().split('T')[0];
+
+            let totalBase = 0;
+            let totalDeductions = 0;
+            let finalNet = 0;
+
+            if (employees.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="9" class="p-10 text-slate-400">لا يوجد بيانات لعرضها</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = employees.map((emp) => {
+                // ✅ توحيد الحقول مع السيستم بتاعك
+                const monthly = n(emp.baseSalary ?? emp.monthlySalary ?? emp.salary?.monthly ?? emp.salaries?.monthly);
+                const daily   = n(emp.dailyRate  ?? emp.dailySalary  ?? emp.salary?.daily   ?? emp.salaries?.daily);
+
+                const cycle = emp.payCycle || emp.cycle || emp.paymentCycle || 'أسبوعي';
+                const periodSalary = computePeriodSalary(monthly, cycle);
+
+                // ✅ ده تقرير بسيط: يعتمد على absentDays لو موجودة
+                const absentDays = n(emp.absentDays);
+                const absenceValue = absentDays * daily;
+
+                const loans = n(emp.loans);
+                const penalties = n(emp.penalties);
+
+                const deducted = absenceValue + loans + penalties;
+                const net = periodSalary - deducted;
+
+                totalBase += periodSalary;
+                totalDeductions += deducted;
+                finalNet += net;
+
+                return `
+                    <tr>
+                        <td class="sticky right-0 bg-white z-10 font-black">${emp.name || "-"}</td>
+                        <td>${cycle}</td>
+                        <td>${monthly.toFixed(0)}</td>
+                        <td>${daily.toFixed(0)}</td>
+                        <td>${absentDays}</td>
+                        <td>${absenceValue.toFixed(0)}</td>
+                        <td>${loans.toFixed(0)}</td>
+                        <td>${penalties.toFixed(0)}</td>
+                        <td class="font-black text-blue-700">${net.toFixed(0)}</td>
+                    </tr>
+                `;
+            }).join('');
+
+            document.getElementById('totalBaseDisplay').innerText = `${totalBase.toFixed(0)} ج.م`;
+            document.getElementById('totalDeductedDisplay').innerText = `${totalDeductions.toFixed(0)} ج.م`;
+            document.getElementById('finalTotalDisplay').innerText = `${finalNet.toFixed(0)} ج.م`;
+        }
+
+        window.onload = loadFullSheet;
+    </script>
+
+    <script type="module" src="js/cloud-sync.js"></script>
+</body>
+</html>
